@@ -43,10 +43,14 @@
     <Reference Include="System.Xml" />
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="Compression\CompressionScheme.cs" />
+    <Compile Include="Compression\Schemes\LZ4LW.cs" />
     <Compile Include="Files\DatEntry.cs" />
     <Compile Include="Files\Dat.cs" />
     <Compile Include="Files\Fat.cs" />
     <Compile Include="Files\FatEntry.cs" />
+    <Compile Include="Files\Fcb.cs" />
+    <Compile Include="Files\FcbEntry.cs" />
     <Compile Include="IO\Endian.cs" />
     <Compile Include="Files\FatEntrySerializer.cs" />
     <Compile Include="IO\NumberHelpers\Align.cs" />
@@ -75,6 +79,7 @@
     <Compile Include="Program.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
     <Compile Include="Values\FileNameHash.cs" />
+    <Compile Include="Values\Hashes\CRC32.cs" />
     <Compile Include="Values\Hashes\CRC64_WD2.cs" />
   </ItemGroup>
   <ItemGroup>
