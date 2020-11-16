@@ -333,6 +333,8 @@ namespace PackLegion
                         }
 
                         fat.Deserialize(input);
+
+                        input.Close();
                     }
                 }
 
@@ -369,25 +371,12 @@ namespace PackLegion
                                 // decompress
                             }
                         }
+
+                        input.Close();
                     }
                 }
 
                 return datEntries.Count > 0 ? datEntries : null;
-            }
-
-            DatEntry GetDatEntryFromHash(List<DatEntry> datEntries, ulong archiveFileHash)
-            {
-                //Console.WriteLine(string.Format("Searching {0} DAT entries", datEntries.Count));
-
-                foreach (DatEntry datEntry in datEntries)
-                {
-                    if (datEntry.fatEntry.nameHash == archiveFileHash)
-                    {
-                        return datEntry;
-                    }
-                }
-
-                return null;
             }
 
             // PackLegion.exe -c "patch" "patch.fat" "common.fat"
@@ -433,12 +422,10 @@ namespace PackLegion
 
             // read patch dat
             string patchDatRead = Path.ChangeExtension(patchFatRead, "dat");
-            Stream patchDatStream = File.OpenRead(patchDatRead);
             List<DatEntry> patchDatEntries = GetDatEntries(outputFat, patchDatRead);
 
             // read common dat
             string commonDatRead = Path.ChangeExtension(commonFatRead, "dat");
-            Stream commonDatStream = File.OpenRead(commonDatRead);
             List<DatEntry> commonDatEntries = GetDatEntries(commonFat, commonDatRead);
 
             string[] inputFilePaths = Directory.GetFiles(inputFolderPath, "*.*", SearchOption.AllDirectories);
