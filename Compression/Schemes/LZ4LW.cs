@@ -19,16 +19,6 @@ namespace PackLegion.Compression.Schemes
             output.Write(buffer, 0, decompressedSize);
         }
 
-        public static void DecompressB(Stream input, int compressedSize, Stream output, int decompressedSize)
-        {
-            byte[] buffer = new byte[decompressedSize];
-            input.Read(buffer, 0, compressedSize);
-
-            DecompressInPlace(buffer, 0, 0);
-
-            output.Write(buffer, 0, decompressedSize);
-        }
-
         private static void DecompressInPlace(byte[] buffer, int inputStartPosition, int safeDecodingOffset)
         {
             int inputPosition = inputStartPosition;
