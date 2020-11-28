@@ -25,7 +25,7 @@ namespace PackLegion
 
             if (this.flags != 0)
             {
-                throw new FormatException("unsupported file flags");
+                //throw new FormatException("unsupported file flags");
             }
 
             var endian = Endian.Little;
@@ -78,7 +78,7 @@ namespace PackLegion
 
             if (flags != 0)
             {
-                throw new FormatException("unsupported file flags");
+                //throw new FormatException("unsupported file flags");
             }
 
             var totalObjectCount = input.ReadValueU32(endian);
@@ -115,12 +115,18 @@ namespace PackLegion
                 {
                     FcbEntry newEntry = newEntries[b];
 
-                    if (BytesToString(newEntry.Fields[nameFieldKey]) == BytesToString(existingEntry.Fields[nameFieldKey]))
-                    {
-                        entries[a] = newEntry;
-                        newEntries.RemoveAt(b);
+                    byte[] o_newEntryBytes = new byte[0];
+                    byte[] o_existingEntryBytes = new byte[0];
 
-                        //Console.WriteLine($"Replaced FCB entry: {BytesToString(existingEntry.Fields[nameFieldKey])}");
+                    if (newEntry.Fields.TryGetValue(nameFieldKey, out o_newEntryBytes) && existingEntry.Fields.TryGetValue(nameFieldKey, out o_existingEntryBytes))
+                    {
+                        if (BytesToString(o_newEntryBytes) == BytesToString(o_existingEntryBytes))
+                        {
+                            entries[a] = newEntry;
+                            newEntries.RemoveAt(b);
+
+                            //Utility.Log.ToConsole($"Replaced FCB entry: {BytesToString(existingEntry.Fields[nameFieldKey])}");
+                        }
                     }
                 }
             }

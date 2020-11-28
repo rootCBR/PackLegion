@@ -92,9 +92,7 @@ namespace PackLegion
                 entries.Count));
             */
 
-            Console.ForegroundColor = ConsoleColor.DarkGray;
-            Console.WriteLine($"Deserialized FAT with {entryCount} entries");
-            Console.ResetColor();
+            Utility.Log.ToConsole($"Deserialized FAT with {entryCount} entries");
         }
 
         public void Serialize(Stream output)
@@ -140,9 +138,7 @@ namespace PackLegion
 
             output.WriteValueU64(0, Endian.Little);
 
-            Console.ForegroundColor = ConsoleColor.DarkGray;
-            Console.WriteLine($"Serialized FAT with {entryCount} entries");
-            Console.ResetColor();
+            Utility.Log.ToConsole($"Serialized FAT with {entryCount} entries");
         }
     }
 }

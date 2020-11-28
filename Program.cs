@@ -47,11 +47,22 @@ namespace PackLegion
                     };
                     */
 
+                    /*
                     args = new string[]
                     {
                         "-c",
                         "patch",
                         "outputDirectory\\patch_new.fat",
+                        "D:\\Games\\Ubisoft\\Watch Dogs Legion\\data_win64\\patch-o.fat",
+                        "D:\\Games\\Ubisoft\\Watch Dogs Legion\\data_win64\\common-o.fat"
+                    };
+                    */
+
+                    args = new string[]
+                    {
+                        "-c",
+                        "D:\\Modding\\Disrupt\\WDL\\_patch",
+                        "patch.fat",
                         "D:\\Games\\Ubisoft\\Watch Dogs Legion\\data_win64\\patch-o.fat",
                         "D:\\Games\\Ubisoft\\Watch Dogs Legion\\data_win64\\common-o.fat"
                     };
@@ -237,9 +248,7 @@ namespace PackLegion
                             outputDatEntries.Add(inputEntry);
                             inputEntry.added = true;
 
-                            Console.ForegroundColor = ConsoleColor.DarkGray;
-                            Console.WriteLine($"Added replacement entry: {inputEntry.name}");
-                            Console.ResetColor();
+                            Utility.Log.ToConsole($"Replaced entry: {inputEntry.name}");
                         }
                     }
 
@@ -247,9 +256,7 @@ namespace PackLegion
                     {
                         outputDatEntries.Add(existingEntry);
 
-                        //Console.ForegroundColor = ConsoleColor.DarkGray;
-                        //Console.WriteLine($"Added existing entry: {existingEntry.fatEntry.nameHash:X16}");
-                        //Console.ResetColor();
+                        //Utility.Log.ToConsole($"Added existing entry: {existingEntry.fatEntry.nameHash:X16}");
                     }
                 }
 
@@ -259,9 +266,7 @@ namespace PackLegion
                     {
                         outputDatEntries.Add(inputEntry);
 
-                        Console.ForegroundColor = ConsoleColor.DarkGray;
-                        Console.WriteLine($"Added new entry: {inputEntry.name}");
-                        Console.ResetColor();
+                        Utility.Log.ToConsole($"Added entry: {inputEntry.name}");
                     }
                 }
 
@@ -294,9 +299,7 @@ namespace PackLegion
 
                     if (newEntry == true)
                     {
-                        Console.ForegroundColor = ConsoleColor.DarkGray;
-                        //Console.WriteLine($"Added entry: {outputEntry.name}");
-                        Console.ResetColor();
+                        //Utility.Log.ToConsole($"Added entry: {outputEntry.name}");
                     }
                 }
 
@@ -311,9 +314,7 @@ namespace PackLegion
                     fat.Serialize(outputFat);
                 }
 
-                Console.ForegroundColor = ConsoleColor.DarkGray;
-                Console.WriteLine("Done!");
-                Console.ResetColor();
+                Utility.Log.ToConsole("Done!");
             }
         }
 
@@ -414,8 +415,8 @@ namespace PackLegion
             string patchFatRead = inputPatchFatPath == null ? outputFatPath : inputPatchFatPath;
             string commonFatRead = inputCommonFatPath;
 
-            Console.WriteLine("Patch FAT: " + patchFatRead);
-            Console.WriteLine("Common FAT: " + commonFatRead);
+            //Console.WriteLine("Patch FAT: " + patchFatRead);
+            //Console.WriteLine("Common FAT: " + commonFatRead);
 
             Fat outputFat = GetFat(patchFatRead);
             Fat commonFat = GetFat(commonFatRead);
@@ -546,18 +547,23 @@ namespace PackLegion
                             baseDatStreamDecompressed = baseDatStream;
                         }
 
+                        //Utility.Log.ToConsole("Deserializing file: " + inputDatEntry.name);
+
                         Fcb inputFcbFile = new Fcb();
                         inputFcbFile.Deserialize(inputDatStream);
 
                         Fcb baseFcbFile = new Fcb();
                         baseFcbFile.Deserialize(baseDatStreamDecompressed);
 
-                        Stream newDatStream = new MemoryStream();
-                        Fcb newFcbFile = baseFcbFile;
-                        newFcbFile.Combine(inputFcbFile);
-                        newFcbFile.Serialize(newDatStream);
+                        if (inputFcbFile.root.Children.Count < baseFcbFile.root.Children.Count)
+                        {
+                            Stream newDatStream = new MemoryStream();
+                            Fcb newFcbFile = baseFcbFile;
+                            newFcbFile.Combine(inputFcbFile);
+                            newFcbFile.Serialize(newDatStream);
 
-                        inputDatEntry.content = ((MemoryStream) newDatStream).ToArray();
+                            inputDatEntry.content = ((MemoryStream)newDatStream).ToArray();
+                        }
 
                         /*
                         string exportPath = Path.Combine(Path.GetFullPath("outputDirectory\\export"), inputDatEntry.name);
@@ -595,9 +601,7 @@ namespace PackLegion
                             outputDatEntries.Add(inputEntry);
                             inputEntry.added = true;
 
-                            Console.ForegroundColor = ConsoleColor.DarkGray;
-                            Console.WriteLine($"Replaced entry: {inputEntry.name}");
-                            Console.ResetColor();
+                            Utility.Log.ToConsole($"Replaced entry: {inputEntry.name}");
                         }
                     }
 
@@ -605,9 +609,7 @@ namespace PackLegion
                     {
                         outputDatEntries.Add(existingEntry);
 
-                        //Console.ForegroundColor = ConsoleColor.DarkGray;
-                        //Console.WriteLine($"Added existing entry: {existingEntry.fatEntry.nameHash:X16}");
-                        //Console.ResetColor();
+                        //Utility.Log.ToConsole($"Added existing entry: {existingEntry.fatEntry.nameHash:X16}");
                     }
                 }
 
@@ -617,9 +619,7 @@ namespace PackLegion
                     {
                         outputDatEntries.Add(inputEntry);
 
-                        Console.ForegroundColor = ConsoleColor.DarkGray;
-                        Console.WriteLine($"Added entry: {inputEntry.name}");
-                        Console.ResetColor();
+                        Utility.Log.ToConsole($"Added entry: {inputEntry.name}");
                     }
                 }
 
@@ -660,9 +660,7 @@ namespace PackLegion
                     outputFat.Serialize(fat);
                 }
 
-                Console.ForegroundColor = ConsoleColor.DarkGray;
-                Console.WriteLine("Done!");
-                Console.ResetColor();
+                Utility.Log.ToConsole("Done!");
             }
         }
     }
