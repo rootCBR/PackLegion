@@ -43,8 +43,11 @@
     <Reference Include="System.Xml" />
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="App\ArgumentInfo.cs" />
+    <Compile Include="App\XML\XmlConfig.cs" />
     <Compile Include="Compression\CompressionScheme.cs" />
     <Compile Include="Compression\Schemes\LZ4LW.cs" />
+    <Compile Include="Config.cs" />
     <Compile Include="Files\DatEntry.cs" />
     <Compile Include="Files\Dat.cs" />
     <Compile Include="Files\Fat.cs" />
@@ -87,7 +90,12 @@
     <None Include="App.config" />
   </ItemGroup>
   <ItemGroup>
-    <Content Include="Assets\filelist.txt" />
+    <Content Include="config.xml">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+  </ItemGroup>
+  <ItemGroup>
+    <Folder Include="Assets\" />
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
 </Project>
