@@ -22,6 +22,7 @@ namespace PackLegion
 
     public class Fat
     {
+        private const Endian endian = Endian.Little;
         private const int _signature = 0x46415435;
 
         public int version;
@@ -42,38 +43,38 @@ namespace PackLegion
 
         public void Deserialize(Stream input)
         {
-            var magic = input.ReadValueU32(Endian.Little);
+            var magic = input.ReadValueU32(endian);
 
             if (magic != _signature)
             {
-                throw new FormatException("bad magic");
+                throw new FormatException("Bad magic");
             }
 
-            var version = input.ReadValueS32(Endian.Little);
+            var version = input.ReadValueS32(endian);
 
             if (version != 13)
             {
-                throw new FormatException("unsupported version");
+                throw new FormatException("Unsupported version");
             }
 
-            var flags = input.ReadValueU32(Endian.Little);
+            var flags = input.ReadValueU32(endian);
 
             this.version = version;
             this.target = flags & 0xFF;
             this.platform = (flags >> 8) & 0xFF;
             this.unk70 = (byte)((flags >> 16) & 0xFF);
-            this.unk5 = input.ReadValueU64(Endian.Little);
-            this.unk6 = input.ReadValueU32(Endian.Little);
+            this.unk5 = input.ReadValueU64(endian);
+            this.unk6 = input.ReadValueU32(endian);
 
-            uint entryCount = input.ReadValueU32(Endian.Little);
+            uint entryCount = input.ReadValueU32(endian);
 
-            FatEntrySerializer fatEntrySerializer = new FatEntrySerializer();
+            FatEntry fatEntry = new FatEntry();
 
             for (uint i = 0; i < entryCount; i++)
             {
                 FatEntry entry;
 
-                fatEntrySerializer.Deserialize(input, Endian.Little, out entry);
+                fatEntry.Deserialize(input, endian, out entry);
                 this.entries.Add(entry);
 
                 //Console.WriteLine(entry.ToString());
@@ -92,7 +93,7 @@ namespace PackLegion
                 entries.Count));
             */
 
-            Utility.Log.ToConsole($"Deserialized FAT with {entryCount} entries");
+            //Utility.Log.ToConsole($"Deserialized FAT with {entryCount} entries");
         }
 
         public void Serialize(Stream output)
@@ -106,39 +107,35 @@ namespace PackLegion
             var unk5 = this.unk5;
             var unk6 = this.unk6;
 
-            var endian = Endian.Little;
-
-            output.WriteValueU32(_signature, Endian.Little);
-            output.WriteValueS32(version, Endian.Little);
+            output.WriteValueU32(_signature, endian);
+            output.WriteValueS32(version, endian);
 
             uint flags = 0;
             flags |= (uint) ((byte) target & 0xFF) << 0;
             flags |= (uint) ((byte) platform & 0xFF) << 8;
             flags |= (uint) (unk70 & 0xFF) << 16;
-            output.WriteValueU32(flags, Endian.Little);
 
-            output.WriteValueU64(unk5, Endian.Little);
-            output.WriteValueU32(unk6, Endian.Little);
-
-            FatEntrySerializer fatEntrySerializer = new FatEntrySerializer();
-
-            var entrySerializer = fatEntrySerializer;
+            output.WriteValueU32(flags, endian);
+            output.WriteValueU64(unk5, endian);
+            output.WriteValueU32(unk6, endian);
 
             int entryCount = this.entries.Count;
 
-            output.WriteValueS32(entryCount, Endian.Little);
+            output.WriteValueS32(entryCount, endian);
+
+            FatEntry fatEntry = new FatEntry();
 
             for (int i = 0; i < this.entries.Count; i++)
             {
                 FatEntry entry = this.entries[i];
-                entrySerializer.Serialize(output, entry, endian);
+                fatEntry.Serialize(output, entry, endian);
 
                 //Console.WriteLine($"Write DAT entry {i}: {entry.nameHash:X16}");
             }
 
-            output.WriteValueU64(0, Endian.Little);
+            output.WriteValueU64(0, endian);
 
-            Utility.Log.ToConsole($"Serialized FAT with {entryCount} entries");
+            //Utility.Log.ToConsole($"Serialized FAT with {entryCount} entries");
         }
     }
 }

@@ -38,8 +38,10 @@ namespace PackLegion
 
         /*
             v1.10 09.12.2020 20:27
+            v1.11 10.12.2020 17:23
+            v1.12 27.01.2021 18:22
         */
-        public static readonly string BuildVersion = "1.10";
+        public static readonly string BuildVersion = "1.12";
 
         public static string VersionString
         {
@@ -47,7 +49,7 @@ namespace PackLegion
         }
 
         static readonly string[] _usage = {
-            "Arguments: [options] <inputFolder> <outputFat> [o:inputFatPatch] [c:inputFatCommon]",
+            "Arguments: [options] <inputFolder> <outputFat>",
             "",
             "Options:",
             "  -o|original      Use the game's original patch archive as a base for the output archive",
@@ -58,9 +60,9 @@ namespace PackLegion
             "",
             "Examples:",
             "  PackLegion.exe       \"patch\" \"patch.fat\"",
-            "  PackLegion.exe -o    \"patch\" \"patch-n.fat\" \"patch-o.fat\"",
-            "  PackLegion.exe -c    \"patch\" \"patch.fat\"                 \"common-o.fat\"",
-            "  PackLegion.exe -o -c \"patch\" \"patch-n.fat\" \"patch-o.fat\" \"common-o.fat\"",
+            "  PackLegion.exe -o    \"patch\" \"patch.fat\"",
+            "  PackLegion.exe -c    \"patch\" \"patch.fat\"",
+            "  PackLegion.exe -o -c \"patch\" \"patch.fat\"",
         };
 
         public static string UsageString
@@ -193,13 +195,13 @@ namespace PackLegion
             XmlDocument doc = new XmlDocument();
             doc.LoadXml(xmlFileContent);
 
-            XmlSerializer serializer = new XmlSerializer(typeof(XmlConfig.Config));
+            XmlSerializer serializer = new XmlSerializer(typeof(XmlConfig));
 
             using (XmlReader reader = new XmlNodeReader(doc))
             {
-                XmlConfig.Config config = new XmlConfig.Config();
+                XmlConfig config = new XmlConfig();
 
-                config = (XmlConfig.Config) serializer.Deserialize(reader);
+                config = (XmlConfig) serializer.Deserialize(reader);
 
                 string commonPath = config.OriginalCommonPath;
                 string patchPath = config.OriginalPatchPath;
@@ -213,6 +215,8 @@ namespace PackLegion
                 {
                     InputFatOriginal = patchPath;
                 }
+
+                reader.Close();
             }
         }
     }
