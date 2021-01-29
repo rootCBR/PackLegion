@@ -5,6 +5,7 @@ using System.Text;
 using System.Threading.Tasks;
 using System.IO;
 using System.Globalization;
+using System.Diagnostics;
 using Gibbed.IO;
 
 namespace PackLegion
@@ -18,6 +19,8 @@ namespace PackLegion
             if (args.Length == 0)
             {
                 Utility.Log.ToConsole(Config.UsageString);
+
+                Console.ReadKey(true);
 
                 return;
 
@@ -73,9 +76,34 @@ namespace PackLegion
             {
                 Config.Initialize(AppDomain.CurrentDomain.BaseDirectory);
 
-                WorkNew();
+                Stopwatch s = Stopwatch.StartNew();
 
-                Utility.Log.ToConsole("Done!");
+                try
+                {
+                    WorkNew();
+                }
+                catch (Exception e)
+                {
+                    s.Stop();
+
+                    Console.WriteLine(e.ToString());
+
+                    //Console.WriteLine("\nPress any key to close...");
+                    Console.ReadKey(true);
+
+                    return;
+                }
+
+                s.Stop();
+
+                if (s.ElapsedMilliseconds < 1000)
+                {
+                    Utility.Log.ToConsole($"Operation finished in {s.ElapsedMilliseconds} ms.");
+                }
+                else
+                {
+                    Utility.Log.ToConsole($"Operation finished in {s.ElapsedMilliseconds / 1000} seconds.");
+                }
             }
             else
             {
@@ -205,98 +233,114 @@ namespace PackLegion
 
                 if (outputDatStream != null)
                 {
-                    FatEntry[] entries = outputFat.entries.OrderBy(e => e.offset).ToArray();
-
-                    foreach (FatEntry existingFatEntry in entries)
+                    if (Config.Option_Original && patchFatRead == inputPatchFatPath)
                     {
-                        outputDatStream.Seek((long)existingFatEntry.offset, SeekOrigin.Begin);
+                        FatEntry[] entries = outputFat.entries.OrderBy(e => e.offset).ToArray();
 
-                        byte[] content = new byte[existingFatEntry.compressedSize];
-                        outputDatStream.Read(content, 0, (int)existingFatEntry.compressedSize);
-
-                        FatEntry fatEntry = new FatEntry();
-
-                        string filePath = HasReplacementEntry(existingFatEntry.nameHash);
-
-                        if (filePath != null)
+                        foreach (FatEntry existingFatEntry in entries)
                         {
-                            bool fcb = false;
+                            /*
+                            outputDatStream.Seek((long)existingFatEntry.offset, SeekOrigin.Begin);
 
-                            if (content.Length >= 6)
+                            byte[] content = new byte[existingFatEntry.compressedSize];
+                            outputDatStream.Read(content, 0, (int)existingFatEntry.compressedSize);
+                            */
+
+                            FatEntry fatEntry = new FatEntry();
+
+                            string filePath = HasReplacementEntry(existingFatEntry.nameHash);
+
+                            /*
+                            if (filePath != null)
                             {
-                                Stream datStream = new MemoryStream(content);
-                                Stream datStreamDecompressed = new MemoryStream();
+                                bool fcb = false;
 
-                                int compressionScheme = (int)existingFatEntry.compressionScheme;
-
-                                if (compressionScheme != 0)
+                                if (content.Length >= 6)
                                 {
-                                    //Console.WriteLine("Decompressing base file");
+                                    Stream datStream = new MemoryStream(content);
+                                    Stream datStreamDecompressed = new MemoryStream();
 
-                                    int sizeCompressed = (int)existingFatEntry.compressedSize;
-                                    int sizeUncompressed = (int)existingFatEntry.uncompressedSize;
+                                    int compressionScheme = (int)existingFatEntry.compressionScheme;
 
-                                    if (compressionScheme == 3)
+                                    if (compressionScheme != 0)
                                     {
-                                        Compression.Schemes.LZ4LW.Decompress(
-                                            datStream,
-                                            sizeCompressed,
-                                            datStreamDecompressed,
-                                            sizeUncompressed);
+                                        //Console.WriteLine("Decompressing base file");
+
+                                        int sizeCompressed = (int)existingFatEntry.compressedSize;
+                                        int sizeUncompressed = (int)existingFatEntry.uncompressedSize;
+
+                                        if (compressionScheme == 3)
+                                        {
+                                            Compression.Schemes.LZ4LW.Decompress(
+                                                datStream,
+                                                sizeCompressed,
+                                                datStreamDecompressed,
+                                                sizeUncompressed);
+                                        }
+                                        else
+                                        {
+                                            throw new InvalidDataException("Unsupported compression scheme");
+                                        }
+
+                                        if ((int)datStreamDecompressed.Length != sizeUncompressed)
+                                        {
+                                            throw new InvalidDataException("Decompression failed");
+                                        }
                                     }
-                                    else
-                                    {
-                                        throw new InvalidDataException("Unsupported compression scheme");
-                                    }
 
-                                    if ((int)datStreamDecompressed.Length != sizeUncompressed)
+                                    datStreamDecompressed.Position = 0;
+
+                                    uint header = datStreamDecompressed.ReadValueU32();
+                                    uint version = datStreamDecompressed.ReadValueU16();
+
+                                    datStreamDecompressed.Close();
+                                    datStream.Close();
+
+                                    if (header == 0x4643626E && version == 3)
                                     {
-                                        throw new InvalidDataException("Decompression failed");
+                                        fcb = true;
                                     }
                                 }
 
-                                datStreamDecompressed.Position = 0;
-
-                                uint header = datStreamDecompressed.ReadValueU32();
-                                uint version = datStreamDecompressed.ReadValueU16();
-
-                                datStreamDecompressed.Close();
-                                datStream.Close();
-
-                                if (header == 0x4643626E && version == 3)
+                                if (fcb != true)
                                 {
-                                    fcb = true;
+                                    fatEntry = new FatEntry()
+                                    {
+                                        nameHash = existingFatEntry.nameHash,
+                                        offset = (ulong)outputDat.Position,
+                                        uncompressedSize = (ulong)content.Length,
+                                        compressedSize = (ulong)content.Length,
+                                        compressionScheme = 0
+                                    };
+
+                                    replacedEntries.Add(fatEntry.nameHash);
+
+                                    //Utility.Log.ToConsole($"Replaced entry: {filePath}");
+                                    Utility.Log.ToConsole($"Entry: {filePath}");
                                 }
                             }
-
-                            if (fcb != true)
+                            else
                             {
-                                fatEntry = new FatEntry()
-                                {
-                                    nameHash = existingFatEntry.nameHash,
-                                    offset = (ulong)outputDat.Position,
-                                    uncompressedSize = (ulong)content.Length,
-                                    compressedSize = (ulong)content.Length,
-                                    compressionScheme = 0
-                                };
-
-                                replacedEntries.Add(fatEntry.nameHash);
-
-                                //Utility.Log.ToConsole($"Replaced entry: {filePath}");
-                                Utility.Log.ToConsole($"Entry: {filePath}");
+                                fatEntry = existingFatEntry;
+                                fatEntry.offset = (ulong)outputDat.Position;
                             }
-                        }
-                        else
-                        {
-                            fatEntry = existingFatEntry;
-                            fatEntry.offset = (ulong)outputDat.Position;
-                        }
+                            */
 
-                        if (Config.Option_Original && patchFatRead == inputPatchFatPath)
-                        {
+                            if (filePath == null)
+                            {
+                                fatEntry.offset = (ulong)outputDat.Position;
+                            }
+
+                            outputDatStream.Seek((long)existingFatEntry.offset, SeekOrigin.Begin);
+
+                            byte[] content = new byte[existingFatEntry.compressedSize];
+                            outputDatStream.Read(content, 0, (int)existingFatEntry.compressedSize);
+
                             outputFatEntries.Add(fatEntry);
 
                             outputDat.Write(content, 0, content.Length);
+
+                            content = null;
                         }
                     }
                 }
@@ -310,160 +354,164 @@ namespace PackLegion
                     string path = file.Replace(inputFolderPath + Path.DirectorySeparatorChar, "");
                     ulong hash = GetFatEntryHash(path);
 
-                    if (!replacedEntries.Contains(hash))
+                    if (replacedEntries.Contains(hash))
                     {
-                        byte[] content = File.ReadAllBytes(file);
+                        continue;
+                    }
 
-                        Stream stream = new MemoryStream(content);
+                    byte[] content = File.ReadAllBytes(file);
 
-                        bool combined = false;
+                    Stream stream = new MemoryStream(content);
 
-                        if (Config.Option_Combine)
+                    bool combined = false;
+
+                    if (Config.Option_Combine)
+                    {
+                        // 1. gather fcb files to modify
+                        // 2. retrieve base fcb files from patch
+                        // 3. retrieve base fcb files from common
+
+                        Stream baseDatStreamDecompressed = new MemoryStream();
+
+                        uint header = stream.ReadValueU32();
+                        uint version = stream.ReadValueU16();
+
+                        stream.Position = 0;
+
+                        if (header == 0x4643626E && version == 3)
                         {
-                            // 1. gather fcb files to modify
-                            // 2. retrieve base fcb files from patch
-                            // 3. retrieve base fcb files from common
+                            //Console.WriteLine($"FCB file: {path}");
 
-                            Stream baseDatStreamDecompressed = new MemoryStream();
+                            bool match = false;
+                            FatEntry baseFatEntry = new FatEntry();
 
-                            uint header = stream.ReadValueU32();
-                            uint version = stream.ReadValueU16();
+                            byte[] baseContent = null;
 
-                            stream.Position = 0;
-
-                            if (header == 0x4643626E && version == 3)
+                            foreach (FatEntry patchFatEntry in outputFat.entries)
                             {
-                                //Console.WriteLine($"FCB file: {path}");
-
-                                bool match = false;
-                                FatEntry baseFatEntry = new FatEntry();
-
-                                byte[] baseContent = null;
-
-                                foreach (FatEntry patchFatEntry in outputFat.entries)
+                                if (patchFatEntry.nameHash == hash)
                                 {
-                                    if (patchFatEntry.nameHash == hash)
+                                    // found fcb base file in patch
+                                    baseFatEntry = patchFatEntry;
+
+                                    baseContent = new byte[baseFatEntry.compressedSize];
+
+                                    outputDatStream.Seek((long)baseFatEntry.offset, SeekOrigin.Begin);
+                                    outputDatStream.Read(baseContent, 0, (int)baseFatEntry.compressedSize);
+
+                                    match = true;
+                                }
+                            }
+
+                            if (match != true)
+                            {
+                                foreach (FatEntry commonFatEntry in commonFat.entries)
+                                {
+                                    if (commonFatEntry.nameHash == hash)
                                     {
-                                        // found fcb base file in patch
-                                        baseFatEntry = patchFatEntry;
+                                        // found fcb base file in common
+                                        baseFatEntry = commonFatEntry;
 
                                         baseContent = new byte[baseFatEntry.compressedSize];
 
-                                        outputDatStream.Seek((long)baseFatEntry.offset, SeekOrigin.Begin);
-                                        outputDatStream.Read(baseContent, 0, (int)baseFatEntry.compressedSize);
+                                        commonDatStream.Seek((long)baseFatEntry.offset, SeekOrigin.Begin);
+                                        commonDatStream.Read(baseContent, 0, (int)baseFatEntry.compressedSize);
 
                                         match = true;
                                     }
                                 }
+                            }
 
-                                if (match != true)
+                            if (match != true)
+                            {
+                                Utility.Log.ToConsole($"Could not combine entry: {path}");
+                                //throw new FileNotFoundException("Could not find base file");
+                            }
+                            else
+                            {
+                                Stream baseDatStream = new MemoryStream(baseContent);
+
+                                int baseFileCompressionScheme = (int)baseFatEntry.compressionScheme;
+
+                                if (baseFileCompressionScheme != 0)
                                 {
-                                    foreach (FatEntry commonFatEntry in commonFat.entries)
+                                    int baseFileSizeCompressed = (int)baseFatEntry.compressedSize;
+                                    int baseFileSizeUncompressed = (int)baseFatEntry.uncompressedSize;
+
+                                    if (baseFileCompressionScheme == 3)
                                     {
-                                        if (commonFatEntry.nameHash == hash)
-                                        {
-                                            // found fcb base file in common
-                                            baseFatEntry = commonFatEntry;
-
-                                            baseContent = new byte[baseFatEntry.compressedSize];
-
-                                            commonDatStream.Seek((long)baseFatEntry.offset, SeekOrigin.Begin);
-                                            commonDatStream.Read(baseContent, 0, (int)baseFatEntry.compressedSize);
-
-                                            match = true;
-                                        }
-                                    }
-                                }
-
-                                if (match != true)
-                                {
-                                    Utility.Log.ToConsole($"Could not combine entry: {path}");
-                                    //throw new FileNotFoundException("Could not find base file");
-                                }
-                                else
-                                {
-                                    Stream baseDatStream = new MemoryStream(baseContent);
-
-                                    int baseFileCompressionScheme = (int)baseFatEntry.compressionScheme;
-
-                                    if (baseFileCompressionScheme != 0)
-                                    {
-                                        int baseFileSizeCompressed = (int)baseFatEntry.compressedSize;
-                                        int baseFileSizeUncompressed = (int)baseFatEntry.uncompressedSize;
-
-                                        if (baseFileCompressionScheme == 3)
-                                        {
-                                            Compression.Schemes.LZ4LW.Decompress(
-                                                baseDatStream,
-                                                baseFileSizeCompressed,
-                                                baseDatStreamDecompressed,
-                                                baseFileSizeUncompressed);
-                                        }
-                                        else
-                                        {
-                                            throw new InvalidDataException("Unsupported compression scheme");
-                                        }
-
-                                        if ((int)baseDatStreamDecompressed.Length != baseFileSizeUncompressed)
-                                        {
-                                            throw new InvalidDataException("Decompression failed");
-                                        }
+                                        Compression.Schemes.LZ4LW.Decompress(
+                                            baseDatStream,
+                                            baseFileSizeCompressed,
+                                            baseDatStreamDecompressed,
+                                            baseFileSizeUncompressed);
                                     }
                                     else
                                     {
-                                        baseDatStreamDecompressed = baseDatStream;
+                                        throw new InvalidDataException("Unsupported compression scheme");
                                     }
 
-                                    Fcb inputFcbFile = new Fcb();
-                                    inputFcbFile.Deserialize(stream);
-
-                                    Fcb baseFcbFile = new Fcb();
-                                    baseFcbFile.Deserialize(baseDatStreamDecompressed);
-
-                                    stream.Close();
-                                    baseDatStreamDecompressed.Close();
-
-                                    if (inputFcbFile.root.Children.Count < baseFcbFile.root.Children.Count)
+                                    if ((int)baseDatStreamDecompressed.Length != baseFileSizeUncompressed)
                                     {
-                                        Stream newDatStream = new MemoryStream();
-                                        Fcb newFcbFile = baseFcbFile;
-                                        newFcbFile.Combine(inputFcbFile);
-                                        newFcbFile.Serialize(newDatStream);
-
-                                        content = ((MemoryStream)newDatStream).ToArray();
-
-                                        combined = true;
+                                        throw new InvalidDataException("Decompression failed");
                                     }
+                                }
+                                else
+                                {
+                                    baseDatStreamDecompressed = baseDatStream;
+                                }
 
-                                    if (combined != true)
-                                    {
-                                        // ?
-                                    }
+                                Fcb inputFcbFile = new Fcb();
+                                inputFcbFile.Deserialize(stream);
+
+                                Fcb baseFcbFile = new Fcb();
+                                baseFcbFile.Deserialize(baseDatStreamDecompressed);
+
+                                stream.Close();
+                                baseDatStreamDecompressed.Close();
+
+                                if (inputFcbFile.root.Children.Count < baseFcbFile.root.Children.Count)
+                                {
+                                    Stream newDatStream = new MemoryStream();
+                                    Fcb newFcbFile = baseFcbFile;
+                                    newFcbFile.Combine(inputFcbFile);
+                                    newFcbFile.Serialize(newDatStream);
+
+                                    content = ((MemoryStream)newDatStream).ToArray();
+
+                                    combined = true;
+                                }
+
+                                if (combined != true)
+                                {
+                                    // ?
                                 }
                             }
                         }
-
-                        outputFatEntries.Add(new FatEntry()
-                        {
-                            nameHash = hash,
-                            offset = (ulong)outputDat.Position,
-                            uncompressedSize = (ulong)content.Length,
-                            compressedSize = (ulong)content.Length,
-                            compressionScheme = 0
-                        });
-
-                        if (combined == true)
-                        {
-                            Utility.Log.ToConsole($"Combined entry: {path}");
-                        }
-                        else
-                        {
-                            //Utility.Log.ToConsole($"Added entry: {path}");
-                            Utility.Log.ToConsole($"Entry: {path}");
-                        }
-
-                        outputDat.Write(content, 0, content.Length);
                     }
+
+                    outputFatEntries.Add(new FatEntry()
+                    {
+                        nameHash = hash,
+                        offset = (ulong)outputDat.Position,
+                        uncompressedSize = (ulong)content.Length,
+                        compressedSize = (ulong)content.Length,
+                        compressionScheme = 0
+                    });
+
+                    if (combined == true)
+                    {
+                        Utility.Log.ToConsole($"Combined entry: {path}");
+                    }
+                    else
+                    {
+                        //Utility.Log.ToConsole($"Added entry: {path}");
+                        Utility.Log.ToConsole($"Entry: {path}");
+                    }
+
+                    outputDat.Write(content, 0, content.Length);
+
+                    content = null;
                 }
 
                 if (outputDatStream != null)
