@@ -7,7 +7,12 @@ using System.IO;
 using System.Globalization;
 using System.Diagnostics;
 using System.CodeDom.Compiler;
+using System.Xml;
+using System.Xml.Serialization;
+using System.Security.Cryptography;
 using Gibbed.IO;
+using PackLegion.Files.XML;
+using PackLegion.External;
 
 namespace PackLegion
 {
@@ -30,6 +35,8 @@ namespace PackLegion
                 {
                         "-o",
                         "-c",
+                        "-v",
+                        "-n",
                         @"D:\Modding\Disrupt\WDL\_patch",
                         "patch.fat"
                 };
@@ -96,6 +103,7 @@ namespace PackLegion
 
             bool modeOriginal = Config.Option_Original;
             bool modeCombine = Config.Option_Combine;
+            bool modeInfo = Config.Option_Info;
 
             string readPatchFatPathOriginal = inputPatchFatPath;
             string readCommonFatPathCombine = inputCommonFatPath;
@@ -194,7 +202,13 @@ namespace PackLegion
                 {
                     Utility.Log.ToConsoleVerbose("Write mode: Create new archive with original files");
 
-                    outputFat.Deserialize(patchFatStream);
+                    if (patchFat == null)
+                    {
+                        patchFat = new Fat();
+                        patchFat.Deserialize(patchFatStream);
+                    }
+
+                    outputFat = patchFat;
                 }
                 else
                 {
@@ -216,27 +230,38 @@ namespace PackLegion
 
                     FatEntry[] entries = outputFat.entries.OrderBy(e => e.offset).ToArray();
 
-                    foreach (FatEntry entry in entries)
-                    {
-                        string replacementFile = GetReplacementEntry(entry.nameHash);
+                    FileStream inputDatStream = outputDatStream;
 
-                        if (replacementFile != null)
+                    if (modeOriginal)
+                    {
+                        inputDatStream = patchDatStream;
+                    }
+
+                    for (int a = 0; a < entries.Length; a++)
+                    {
+                        FatEntry entry = entries[a];
+
+                        if (GetReplacementEntry(entry.nameHash) != null)
                         {
                             continue;
                         }
 
-                        FatEntry fatEntry = new FatEntry();
-                        fatEntry.offset = (ulong)outputDatStream.Position;
-
-                        outputDatStream.Seek((long)entry.offset, SeekOrigin.Begin);
-
                         byte[] content = new byte[entry.compressedSize];
-                        outputDatStream.Read(content, 0, (int)entry.compressedSize);
 
-                        outputFatEntries.Add(fatEntry);
+                        inputDatStream.Seek((long)entry.offset, SeekOrigin.Begin);
+                        inputDatStream.Read(content, 0, (int)entry.compressedSize);
+
+                        //Console.WriteLine($"\nRead {entry.compressedSize} bytes from {entry.offset}");
+
+                        entry.offset = (ulong)outputDatStream.Position;
+                        outputFatEntries.Add(entry);
 
                         outputDatStream.Write(content, 0, content.Length);
+
+                        //Console.WriteLine($"Write {entry.compressedSize} bytes from {(ulong) outputDatStream.Position - entry.compressedSize}");
                     }
+
+                    //inputDatStream.Close();
 
                     /*
                     Directory.CreateDirectory("temp");
@@ -484,6 +509,83 @@ namespace PackLegion
                     commonDatStream.Close();
                     commonFatStream.Close();
                 }
+
+                if (modeInfo)
+                {
+                    Utility.Log.ToConsole("Writing info file...");
+
+                    Dictionary<uint, string> compressionSchemes = new Dictionary<uint, string>
+                    {
+                        {0, "none" },
+                        {1, "oodle" },  // ?
+                        {2, "lzma" },   // ?
+                        {3, "lz4lw" },
+                    };
+
+                    string infoFilePath = Path.ChangeExtension(writeOutputFatPath, "nfo");
+
+                    if (File.Exists(infoFilePath))
+                    {
+                        File.Delete(infoFilePath);
+                    }
+
+                    PackInfo info = new PackInfo();
+
+                    foreach (FatEntry entry in outputFatEntries)
+                    {
+                        string path = GetFilePathFromHash(entry.nameHash);
+                        ulong time = 0;
+                        uint crc = 0;
+
+                        if (path != null)
+                        {
+                            var crc32 = new Crc32();
+                            var hash = string.Empty;
+
+                            using (var fs = File.OpenRead(path))
+                            {
+                                foreach (byte b in crc32.ComputeHash(fs))
+                                {
+                                    hash += b.ToString("x2").ToLower();
+                                }
+                            }
+
+                            path = path.Replace(inputFolderPath + Path.DirectorySeparatorChar, "").ToLower();
+                            //time = (ulong) File.GetLastWriteTime(path).Ticks; //?
+                            crc = uint.Parse(hash, NumberStyles.HexNumber);
+                        }
+                        else
+                        {
+                            path = $"_unknown\\0x{entry.nameHash:X16}";
+                        }
+
+                        info.common.Add(new RootFile()
+                        {
+                            Path = path,
+                            Crc = entry.nameHash,
+                            FilePosition = (uint)entry.offset,
+                            FileSize = (uint)entry.compressedSize,
+                            FileTime = time,
+                            FileCRC = crc,
+                            Compression = compressionSchemes[entry.compressionScheme],
+                            FATsection = "compact",
+                            OriginalFileSize = (uint)entry.uncompressedSize,
+                            OriginalFileSizeSpecified = entry.compressionScheme != 0 ? true : false
+                        });
+                    }
+
+                    using (var writer = new StreamWriter(infoFilePath))
+                    {
+                        var serializer = new XmlSerializer(typeof(PackInfo));
+
+                        using (var xmlWriter = XmlWriter.Create(writer, new XmlWriterSettings { Indent = true, NewLineOnAttributes = true }))
+                        {
+                            serializer.Serialize(xmlWriter, info);
+
+                            xmlWriter.Close();
+                        }
+                    }
+                }
             }
 
             string GetReplacementEntry(ulong hash)
@@ -499,6 +601,22 @@ namespace PackLegion
                 }
 
                 return null;
+            }
+
+            string GetFilePathFromHash(ulong hash)
+            {
+                for (int i = 0; i < inputFilePaths.Length; i++)
+                {
+                    string path = inputFilePaths[i].Replace(inputFolderPath + Path.DirectorySeparatorChar, "").Trim();
+                    ulong fileHash = Values.Hashes.CRC64_WD2.Compute(path);
+
+                    if (fileHash == hash)
+                    {
+                        return inputFilePaths[i];
+                    }
+                }
+
+                return null; //Convert.ToString($"0x{hash:X16}");
             }
         }
 

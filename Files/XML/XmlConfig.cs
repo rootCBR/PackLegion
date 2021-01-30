@@ -4,7 +4,7 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace PackLegion.App.XML
+namespace PackLegion.Files.XML
 {
     // NOTE: Generated code may require at least .NET Framework 4.5 or .NET Core/Standard 2.0.
     /// <remarks/>
@@ -18,6 +18,8 @@ namespace PackLegion.App.XML
         private string originalCommonPathField;
 
         private string originalPatchPathField;
+
+        private string filelistPathField;
 
         /// <remarks/>
         public string OriginalCommonPath
@@ -42,6 +44,19 @@ namespace PackLegion.App.XML
             set
             {
                 this.originalPatchPathField = value;
+            }
+        }
+
+        /// <remarks/>
+        public string FilelistPath
+        {
+            get
+            {
+                return this.filelistPathField;
+            }
+            set
+            {
+                this.filelistPathField = value;
             }
         }
     }

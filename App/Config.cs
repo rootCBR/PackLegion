@@ -7,7 +7,7 @@ using System.Reflection;
 using System.IO;
 using System.Xml;
 using System.Xml.Serialization;
-using PackLegion.App.XML;
+using PackLegion.Files.XML;
 
 namespace PackLegion
 {
@@ -16,10 +16,12 @@ namespace PackLegion
         public static bool Option_Combine;
         public static bool Option_Original;
         public static bool Option_Verbose;
+        public static bool Option_Info;
         public static string InputFolder;
         public static string InputFatOriginal;
         public static string InputFatCommon;
         public static string OutputFat;
+        public static string Filelist;
 
         public static IEnumerable<ArgumentInfo> Arguments
         {
@@ -45,8 +47,9 @@ namespace PackLegion
             v1.14 28.01.2021 02:54
             v1.15 29.01.2021 17:06
             v1.16 30.01.2021 02:11
+            v1.17 30.01.2021 22:30
         */
-        public static readonly string BuildVersion = "1.16";
+        public static readonly string BuildVersion = "1.17";
 
         public static string VersionString
         {
@@ -63,6 +66,7 @@ namespace PackLegion
             "                   those that are already contained in the game files.",
             "                   Make sure your modified library files only contain the modified objects.",
             "  -v|verbose       Enable additional logging.",
+            "  -n|nfo           Generate *.nfo file along with the output archive.",
             "",
             "Examples:",
             "  PackLegion.exe       \"patch\" \"patch.fat\"",
@@ -147,6 +151,11 @@ namespace PackLegion
                                 Option_Verbose = true;
                                 optionCount++;
                                 break;
+                            case "n":
+                            case "nfo":
+                                Option_Info = true;
+                                optionCount++;
+                                break;
                         }
                     }
                 }
@@ -216,6 +225,7 @@ namespace PackLegion
 
                 string commonPath = config.OriginalCommonPath;
                 string patchPath = config.OriginalPatchPath;
+                string filelistPath = config.FilelistPath;
 
                 if (!string.IsNullOrEmpty(commonPath) && string.IsNullOrEmpty(InputFatCommon))
                 {
@@ -225,6 +235,11 @@ namespace PackLegion
                 if (!string.IsNullOrEmpty(patchPath) && string.IsNullOrEmpty(InputFatOriginal))
                 {
                     InputFatOriginal = patchPath;
+                }
+
+                if (!string.IsNullOrEmpty(filelistPath) && string.IsNullOrEmpty(Filelist))
+                {
+                    Filelist = filelistPath;
                 }
 
                 reader.Close();
