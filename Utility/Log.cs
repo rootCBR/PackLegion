@@ -14,5 +14,17 @@ namespace PackLegion.Utility
             Console.WriteLine(text);
             Console.ResetColor();
         }
+
+        public static void ToConsoleVerbose(string text)
+        {
+            if (!Config.Option_Verbose)
+            {
+                return;
+            }
+
+            Console.ForegroundColor = ConsoleColor.DarkGray;
+            Console.WriteLine(text);
+            Console.ResetColor();
+        }
     }
 }

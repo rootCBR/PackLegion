@@ -6,6 +6,7 @@ using System.Threading.Tasks;
 using System.IO;
 using System.Globalization;
 using System.Diagnostics;
+using System.CodeDom.Compiler;
 using Gibbed.IO;
 
 namespace PackLegion
@@ -27,43 +28,6 @@ namespace PackLegion
                 /*
                 args = new string[]
                 {
-                    "D:\\Modding\\Disrupt\\Tools\\Repos\\_Test\\PackLegion\\bin\\Debug\\patch",
-                    "D:\\Modding\\Disrupt\\Tools\\Repos\\_Test\\PackLegion\\bin\\Debug\\outputDirectory\\patch_new.fat",
-                    "D:\\Modding\\Disrupt\\Tools\\Repos\\_Test\\PackLegion\\bin\\Debug\\outputDirectory\\patch.fat"
-                };
-                */
-
-                /*
-                args = new string[]
-                {
-                    "patch",
-                    //"outputDirectory\\patch_new.fat",
-                    "outputDirectory\\patch3.fat"
-                };
-                */
-
-                /*
-                args = new string[]
-                {
-                    "-c",
-                    "patch",
-                    "outputDirectory\\patch_new.fat",
-                    "D:\\Games\\Ubisoft\\Watch Dogs Legion\\data_win64\\patch-o.fat",
-                    "D:\\Games\\Ubisoft\\Watch Dogs Legion\\data_win64\\common-o.fat"
-                };
-                */
-
-                /*
-                args = new string[]
-                {
-                        //"-c",
-                        "-o",
-                        "D:\\Modding\\Disrupt\\WDL\\_patch",
-                        "patch.fat",
-                };
-
-                args = new string[]
-                {
                         "-o",
                         "-c",
                         @"D:\Modding\Disrupt\WDL\_patch",
@@ -80,7 +44,7 @@ namespace PackLegion
 
                 try
                 {
-                    WorkNew();
+                    WorkReallyNew();
                 }
                 catch (Exception e)
                 {
@@ -108,6 +72,433 @@ namespace PackLegion
             else
             {
                 throw new Exception("Invalid number of arguments");
+            }
+
+            //Console.ReadKey(true);
+        }
+
+        public static void WorkReallyNew()
+        {
+            if (string.IsNullOrEmpty(Config.InputFolder))
+            {
+                throw new Exception("Invalid input folder");
+            }
+
+            string inputFolderPath = Path.GetFullPath(Config.InputFolder);
+            string inputPatchFatPath = !string.IsNullOrEmpty(Config.InputFatOriginal) ? Path.GetFullPath(Config.InputFatOriginal) : string.Empty;
+            string inputCommonFatPath = !string.IsNullOrEmpty(Config.InputFatCommon) ? Path.GetFullPath(Config.InputFatCommon) : string.Empty;
+            string outputFatPath = !string.IsNullOrEmpty(Config.OutputFat) ? Path.GetFullPath(Config.OutputFat) : Path.GetFullPath(inputFolderPath.Split(Path.DirectorySeparatorChar).Last() + ".fat");
+
+            if (!Directory.Exists(inputFolderPath))
+            {
+                throw new DirectoryNotFoundException(inputFolderPath);
+            }
+
+            bool modeOriginal = Config.Option_Original;
+            bool modeCombine = Config.Option_Combine;
+
+            string readPatchFatPathOriginal = inputPatchFatPath;
+            string readCommonFatPathCombine = inputCommonFatPath;
+
+            string readInputFatPath = null;
+            string readPatchFatPath = null;
+            string readCommonFatPath = null;
+
+            string writeOutputFatPath = outputFatPath;
+
+            if (modeOriginal || modeCombine)
+            {
+                if (modeCombine)
+                {
+                    readInputFatPath = outputFatPath;
+                    readPatchFatPath = readPatchFatPathOriginal;
+                    readCommonFatPath = readCommonFatPathCombine;
+                }
+
+                if (modeOriginal)
+                {
+                    readPatchFatPath = readPatchFatPathOriginal;
+                }
+            }
+            else
+            {
+                readInputFatPath = outputFatPath;
+            }
+
+            Utility.Log.ToConsoleVerbose(string.Format("Input archive to read from:\t\t{0}\nOriginal patch archive to read from:\t{1}\nOriginal common archive to read from:\t{2}\nArchive to write to:\t\t\t{3}", readInputFatPath, readPatchFatPath, readCommonFatPath, writeOutputFatPath));
+
+            string[] inputFilePaths = Directory.GetFiles(inputFolderPath, "*.*", SearchOption.AllDirectories);
+
+            using (var outputDatStream = File.Open(Path.ChangeExtension(writeOutputFatPath, "dat"), FileMode.OpenOrCreate, FileAccess.ReadWrite))
+            using (var outputFatStream = File.Open(writeOutputFatPath, FileMode.OpenOrCreate, FileAccess.ReadWrite))
+            {
+                FileStream patchDatStream = null;
+                FileStream patchFatStream = null;
+
+                FileStream commonDatStream = null;
+                FileStream commonFatStream = null;
+
+                if (writeOutputFatPath != readPatchFatPath && writeOutputFatPath != readCommonFatPath)
+                {
+                    if (modeOriginal || modeCombine)
+                    {
+                        string readPatchDatPath = Path.ChangeExtension(readPatchFatPath, "dat");
+
+                        if (File.Exists(readPatchDatPath) && File.Exists(readPatchFatPath))
+                        {
+                            patchDatStream = File.OpenRead(readPatchDatPath);
+                            patchFatStream = File.OpenRead(readPatchFatPath);
+                        }
+                        else
+                        {
+                            throw new FileNotFoundException("Original patch archive does not exist");
+                        }
+
+                        if (modeCombine)
+                        {
+                            string readCommonDatPath = Path.ChangeExtension(readCommonFatPath, "dat");
+
+                            if (File.Exists(readCommonDatPath) && File.Exists(readCommonFatPath))
+                            {
+                                commonDatStream = File.OpenRead(readCommonDatPath);
+                                commonFatStream = File.OpenRead(readCommonFatPath);
+                            }
+                            else
+                            {
+                                throw new FileNotFoundException("Original common archive does not exist");
+                            }
+                        }
+                    }
+                }
+                else
+                {
+                    throw new Exception("Attempting to write to original archive");
+                }
+
+                Fat outputFat = new Fat();
+                Fat patchFat = null;
+                Fat commonFat = null;
+
+                if (modeCombine)
+                {
+                    patchFat = new Fat();
+                    patchFat.Deserialize(patchFatStream);
+
+                    commonFat = new Fat();
+                    commonFat.Deserialize(commonFatStream);
+                }
+
+                List<FatEntry> outputFatEntries = new List<FatEntry>();
+
+                if (modeOriginal)
+                {
+                    Utility.Log.ToConsoleVerbose("Write mode: Create new archive with original files");
+
+                    outputFat.Deserialize(patchFatStream);
+                }
+                else
+                {
+                    if (outputFatStream.Length != 0)
+                    {
+                        Utility.Log.ToConsoleVerbose("Write mode: Insert into existing archive");
+
+                        outputFat.Deserialize(outputFatStream);
+                    }
+                    else
+                    {
+                        Utility.Log.ToConsoleVerbose("Write mode: Create new archive");
+                    }
+                }
+
+                if (outputFat.entries.Count > 0)
+                {
+                    Utility.Log.ToConsole("Iterating original files...");
+
+                    FatEntry[] entries = outputFat.entries.OrderBy(e => e.offset).ToArray();
+
+                    foreach (FatEntry entry in entries)
+                    {
+                        string replacementFile = GetReplacementEntry(entry.nameHash);
+
+                        if (replacementFile != null)
+                        {
+                            continue;
+                        }
+
+                        FatEntry fatEntry = new FatEntry();
+                        fatEntry.offset = (ulong)outputDatStream.Position;
+
+                        outputDatStream.Seek((long)entry.offset, SeekOrigin.Begin);
+
+                        byte[] content = new byte[entry.compressedSize];
+                        outputDatStream.Read(content, 0, (int)entry.compressedSize);
+
+                        outputFatEntries.Add(fatEntry);
+
+                        outputDatStream.Write(content, 0, content.Length);
+                    }
+
+                    /*
+                    Directory.CreateDirectory("temp");
+
+                    using (var temp = new TempFileCollection("temp", true))
+                    {
+                        string tempFileName = temp.AddExtension("dat");
+
+                        using (var createdStream = File.OpenWrite(tempFileName))
+                        {
+                            //Console.WriteLine(tempFileName);
+
+                            FatEntry[] entries = outputFat.entries.OrderBy(e => e.offset).ToArray();
+
+                            int lastMatch = 0;
+
+                            for (int a = 0; a < entries.Length; a++)
+                            {
+                                FatEntry entry = entries[a];
+
+                                bool hasReplacement = false;
+                                uint matches = 0;
+
+                                for (int b = 0; b < inputFilePaths.Length; b++)
+                                {
+                                    string path = inputFilePaths[b];
+
+                                    if (entry.nameHash == GetFatEntryHash(path.Replace(inputFolderPath + Path.DirectorySeparatorChar, "")))
+                                    {
+                                        hasReplacement = true;
+                                        matches++;
+
+                                        break;
+                                    }
+                                }
+
+                                if (hasReplacement)
+                                {
+                                    if (matches == inputFilePaths.Length - 1)
+                                    {
+                                        entries[a].offset = (ulong)createdStream.Position;
+
+                                        byte[] block = new byte[outputDatStream.Length - outputDatStream.Position];
+                                        outputDatStream.Read(block, 0, (int)(outputDatStream.Length - outputDatStream.Position));
+
+                                        createdStream.WriteBytes(block);
+                                    }
+                                    else
+                                    {
+                                        for (int c = lastMatch; c < a; c++)
+                                        {
+                                            entries[c].offset = (ulong)createdStream.Position;
+
+                                            FatEntry pastEntry = entries[c];
+
+                                            byte[] block = new byte[pastEntry.compressedSize];
+                                            outputDatStream.Read(block, 0, (int)pastEntry.compressedSize);
+
+                                            createdStream.WriteBytes(block);
+                                        }
+                                    }
+
+                                    lastMatch = a;
+                                }
+                            }
+
+                            //createdStream.Position = 0;
+                            //createdStream.CopyTo(outputDatStream);
+                            createdStream.Close();
+
+                            entries = null;
+                        }
+
+                        //temp.Delete();
+                    }
+                    */
+                }
+
+                foreach (string file in inputFilePaths)
+                {
+                    string path = file.Replace(inputFolderPath + Path.DirectorySeparatorChar, "");
+                    ulong hash = GetFatEntryHash(path);
+
+                    Stream stream = new MemoryStream(File.ReadAllBytes(file));
+
+                    bool combined = false;
+
+                    if (modeCombine)
+                    {
+                        Stream baseDatStreamDecompressed = new MemoryStream();
+
+                        uint header = stream.ReadValueU32();
+                        uint version = stream.ReadValueU16();
+
+                        stream.Position = 0;
+
+                        if (header == 0x4643626E && version == 3)
+                        {
+                            Utility.Log.ToConsoleVerbose($"FCB file: {path}");
+
+                            bool match = false;
+                            FatEntry baseFatEntry = new FatEntry();
+
+                            byte[] baseContent = null;
+
+                            FatEntry[] patchEntries = patchFat.entries.OrderBy(e => e.offset).ToArray();
+
+                            // search in patch
+                            foreach (FatEntry entry in patchEntries)
+                            {
+                                if (entry.nameHash == hash)
+                                {
+                                    baseFatEntry = entry;
+
+                                    baseContent = new byte[baseFatEntry.compressedSize];
+
+                                    patchDatStream.Seek((long)baseFatEntry.offset, SeekOrigin.Begin);
+                                    patchDatStream.Read(baseContent, 0, (int)baseFatEntry.compressedSize);
+
+                                    match = true;
+                                }
+                            }
+
+                            // search in common
+                            if (match != true)
+                            {
+                                FatEntry[] commonEntries = commonFat.entries.OrderBy(e => e.offset).ToArray();
+
+                                foreach (FatEntry entry in commonEntries)
+                                {
+                                    if (entry.nameHash == hash)
+                                    {
+                                        baseFatEntry = entry;
+
+                                        baseContent = new byte[baseFatEntry.compressedSize];
+
+                                        commonDatStream.Seek((long)baseFatEntry.offset, SeekOrigin.Begin);
+                                        commonDatStream.Read(baseContent, 0, (int)baseFatEntry.compressedSize);
+
+                                        match = true;
+                                    }
+                                }
+                            }
+
+                            if (match != true)
+                            {
+                                Utility.Log.ToConsole($"Could not combine entry: {path}");
+                                //throw new FileNotFoundException("Could not find base file");
+                            }
+                            else
+                            {
+                                Stream baseDatStream = new MemoryStream(baseContent);
+
+                                int baseFileCompressionScheme = (int)baseFatEntry.compressionScheme;
+
+                                if (baseFileCompressionScheme != 0)
+                                {
+                                    int baseFileSizeCompressed = (int)baseFatEntry.compressedSize;
+                                    int baseFileSizeUncompressed = (int)baseFatEntry.uncompressedSize;
+
+                                    if (baseFileCompressionScheme == 3)
+                                    {
+                                        Compression.Schemes.LZ4LW.Decompress(
+                                            baseDatStream,
+                                            baseFileSizeCompressed,
+                                            baseDatStreamDecompressed,
+                                            baseFileSizeUncompressed);
+                                    }
+                                    else
+                                    {
+                                        throw new InvalidDataException("Unsupported compression scheme");
+                                    }
+
+                                    if ((int)baseDatStreamDecompressed.Length != baseFileSizeUncompressed)
+                                    {
+                                        throw new InvalidDataException("Decompression failed");
+                                    }
+                                }
+                                else
+                                {
+                                    baseDatStreamDecompressed = baseDatStream;
+                                }
+
+                                Fcb inputFcbFile = new Fcb();
+                                inputFcbFile.Deserialize(stream);
+
+                                Fcb baseFcbFile = new Fcb();
+                                baseFcbFile.Deserialize(baseDatStreamDecompressed);
+
+                                stream.Close();
+                                baseDatStreamDecompressed.Close();
+
+                                if (inputFcbFile.root.Children.Count < baseFcbFile.root.Children.Count)
+                                {
+                                    Stream newDatStream = new MemoryStream();
+                                    Fcb newFcbFile = baseFcbFile;
+                                    newFcbFile.Combine(inputFcbFile);
+                                    newFcbFile.Serialize(newDatStream);
+
+                                    stream = newDatStream;
+
+                                    combined = true;
+                                }
+                            }
+                        }
+                    }
+
+                    outputFatEntries.Add(new FatEntry()
+                    {
+                        nameHash = hash,
+                        offset = (ulong)outputDatStream.Position,
+                        uncompressedSize = (ulong)stream.Length,
+                        compressedSize = (ulong)stream.Length,
+                        compressionScheme = 0
+                    });
+
+                    outputDatStream.Write(((MemoryStream) stream).ToArray(), 0, (int) stream.Length);
+
+                    if (combined)
+                    {
+                        Utility.Log.ToConsole($"Entry (combined): {path}");
+                    }
+                    else
+                    {
+                        Utility.Log.ToConsole($"Entry: {path}");
+                    }
+                }
+
+                // ...
+
+                outputFat.entries = outputFatEntries;
+                outputFat.Serialize(outputFatStream);
+
+                outputFatStream.Close();
+                outputDatStream.Close();
+
+                if (patchDatStream != null)
+                {
+                    patchDatStream.Close();
+                    patchFatStream.Close();
+                }
+
+                if (commonDatStream != null)
+                {
+                    commonDatStream.Close();
+                    commonFatStream.Close();
+                }
+            }
+
+            string GetReplacementEntry(ulong hash)
+            {
+                foreach (string path in inputFilePaths)
+                {
+                    string file = path.Replace(inputFolderPath + Path.DirectorySeparatorChar, "");
+
+                    if (GetFatEntryHash(file) == hash)
+                    {
+                        return file;
+                    }
+                }
+
+                return null;
             }
         }
 

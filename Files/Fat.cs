@@ -43,6 +43,8 @@ namespace PackLegion
 
         public void Deserialize(Stream input)
         {
+            input.Position = 0;
+
             var magic = input.ReadValueU32(endian);
 
             if (magic != _signature)
@@ -98,6 +100,8 @@ namespace PackLegion
 
         public void Serialize(Stream output)
         {
+            output.Position = 0;
+
             var version = 13;
 
             //var unk1 = this.unk1;

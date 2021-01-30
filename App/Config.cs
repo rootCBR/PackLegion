@@ -15,6 +15,7 @@ namespace PackLegion
     {
         public static bool Option_Combine;
         public static bool Option_Original;
+        public static bool Option_Verbose;
         public static string InputFolder;
         public static string InputFatOriginal;
         public static string InputFatCommon;
@@ -43,8 +44,9 @@ namespace PackLegion
             v1.13 27.01.2021 18:22
             v1.14 28.01.2021 02:54
             v1.15 29.01.2021 17:06
+            v1.16 30.01.2021 02:11
         */
-        public static readonly string BuildVersion = "1.15";
+        public static readonly string BuildVersion = "1.16";
 
         public static string VersionString
         {
@@ -60,6 +62,7 @@ namespace PackLegion
             "  -c|combine       Automatically combine your modified library files (*.lib) with",
             "                   those that are already contained in the game files.",
             "                   Make sure your modified library files only contain the modified objects.",
+            "  -v|verbose       Enable additional logging.",
             "",
             "Examples:",
             "  PackLegion.exe       \"patch\" \"patch.fat\"",
@@ -137,6 +140,11 @@ namespace PackLegion
                             case "o":
                             case "original":
                                 Option_Original = true;
+                                optionCount++;
+                                break;
+                            case "v":
+                            case "verbose":
+                                Option_Verbose = true;
                                 optionCount++;
                                 break;
                         }
