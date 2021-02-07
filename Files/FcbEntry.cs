@@ -8,6 +8,7 @@ using Gibbed.IO;
 
 namespace PackLegion
 {
+    // Source: Gibbed.Disrupt
     public class FcbEntry
     {
         private long _Position;

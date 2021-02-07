@@ -8,12 +8,11 @@ using Gibbed.IO;
 
 namespace PackLegion
 {
-    public class Fcb
+    // Source: Gibbed.Disrupt
+    public struct Fcb
     {
-        private const int _signature = 0x4643626E;
-
-        public ushort version = 3;
-        public ushort flags = 0;
+        public ushort version;
+        public ushort flags;
         public FcbEntry root;
 
         public void Serialize(Stream output)
@@ -29,6 +28,7 @@ namespace PackLegion
             }
 
             var endian = Endian.Little;
+            uint signature = 0x4643626E;
 
             using (var data = new MemoryStream())
             {
@@ -41,7 +41,7 @@ namespace PackLegion
                 data.Position = 0;
 
                 // write magic
-                output.WriteValueU32(_signature, endian);
+                output.WriteValueU32(signature, endian);
 
                 // write version
                 output.WriteValueU16(this.version, endian);
@@ -59,10 +59,11 @@ namespace PackLegion
             input.Position = 0;
 
             var endian = Endian.Little;
+            uint signature = 0x4643626E;
 
             var magic = input.ReadValueU32(endian);
 
-            if (magic != _signature)
+            if (magic != signature)
             {
                 throw new FormatException("invalid header magic");
             }

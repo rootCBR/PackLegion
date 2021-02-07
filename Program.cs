@@ -36,7 +36,7 @@ namespace PackLegion
                         "-o",
                         "-c",
                         "-v",
-                        "-n",
+                        //"-n",
                         @"D:\Modding\Disrupt\WDL\_patch",
                         "patch.fat"
                 };
@@ -189,9 +189,11 @@ namespace PackLegion
 
                 if (modeCombine)
                 {
+                    Utility.Log.ToConsoleVerbose("Deserializing original patch archive...");
                     patchFat = new Fat();
                     patchFat.Deserialize(patchFatStream);
 
+                    Utility.Log.ToConsoleVerbose("Deserializing original common archive...");
                     commonFat = new Fat();
                     commonFat.Deserialize(commonFatStream);
                 }
@@ -204,6 +206,7 @@ namespace PackLegion
 
                     if (patchFat == null)
                     {
+                        Utility.Log.ToConsoleVerbose("Not prepared yet, deserializing original patch archive...");
                         patchFat = new Fat();
                         patchFat.Deserialize(patchFatStream);
                     }
@@ -216,6 +219,7 @@ namespace PackLegion
                     {
                         Utility.Log.ToConsoleVerbose("Write mode: Insert into existing archive");
 
+                        Utility.Log.ToConsoleVerbose("Deserializing output archive...");
                         outputFat.Deserialize(outputFatStream);
                     }
                     else
@@ -224,9 +228,10 @@ namespace PackLegion
                     }
                 }
 
+
                 if (outputFat.entries.Count > 0)
                 {
-                    Utility.Log.ToConsole("Iterating original files...");
+                    //Utility.Log.ToConsole("Iterating original files...");
 
                     FatEntry[] entries = outputFat.entries.OrderBy(e => e.offset).ToArray();
 
@@ -239,6 +244,15 @@ namespace PackLegion
 
                     for (int a = 0; a < entries.Length; a++)
                     {
+                        double x = entries[a].offset;
+                        double y = inputDatStream.Length;
+                        double t = x / y;
+                        int percentage = (int)Math.Round(t * 100);
+
+                        Console.ForegroundColor = ConsoleColor.DarkGray;
+                        Console.Write($"\rIterating original files... ({percentage}%)");
+                        Console.ResetColor();
+
                         FatEntry entry = entries[a];
 
                         if (GetReplacementEntry(entry.nameHash) != null)
@@ -260,6 +274,8 @@ namespace PackLegion
 
                         //Console.WriteLine($"Write {entry.compressedSize} bytes from {(ulong) outputDatStream.Position - entry.compressedSize}");
                     }
+
+                    Console.WriteLine("\r");
 
                     //inputDatStream.Close();
 
@@ -340,6 +356,8 @@ namespace PackLegion
                     */
                 }
 
+                Utility.Log.ToConsole("Adding input files...");
+
                 foreach (string file in inputFilePaths)
                 {
                     string path = file.Replace(inputFolderPath + Path.DirectorySeparatorChar, "");
@@ -353,44 +371,31 @@ namespace PackLegion
                     {
                         Stream baseDatStreamDecompressed = new MemoryStream();
 
-                        uint header = stream.ReadValueU32();
-                        uint version = stream.ReadValueU16();
+                        var endian = Endian.Little;
 
-                        stream.Position = 0;
+                        uint header = stream.ReadValueU32(endian);
+                        uint version = stream.ReadValueU16(endian);
 
                         if (header == 0x4643626E && version == 3)
                         {
                             Utility.Log.ToConsoleVerbose($"FCB file: {path}");
 
-                            bool match = false;
-                            FatEntry baseFatEntry = new FatEntry();
+                            Fcb fcb = new Fcb();
+                            fcb.Deserialize(stream);
 
-                            byte[] baseContent = null;
+                            uint LibHash = 0xA90F3BCC;
 
-                            FatEntry[] patchEntries = patchFat.entries.OrderBy(e => e.offset).ToArray();
-
-                            // search in patch
-                            foreach (FatEntry entry in patchEntries)
+                            if (fcb.root.NameHash == LibHash)
                             {
-                                if (entry.nameHash == hash)
-                                {
-                                    baseFatEntry = entry;
+                                bool match = false;
+                                FatEntry baseFatEntry = new FatEntry();
 
-                                    baseContent = new byte[baseFatEntry.compressedSize];
+                                byte[] baseContent = null;
 
-                                    patchDatStream.Seek((long)baseFatEntry.offset, SeekOrigin.Begin);
-                                    patchDatStream.Read(baseContent, 0, (int)baseFatEntry.compressedSize);
+                                FatEntry[] patchEntries = patchFat.entries.OrderBy(e => e.offset).ToArray();
 
-                                    match = true;
-                                }
-                            }
-
-                            // search in common
-                            if (match != true)
-                            {
-                                FatEntry[] commonEntries = commonFat.entries.OrderBy(e => e.offset).ToArray();
-
-                                foreach (FatEntry entry in commonEntries)
+                                // search in patch
+                                foreach (FatEntry entry in patchEntries)
                                 {
                                     if (entry.nameHash == hash)
                                     {
@@ -398,74 +403,96 @@ namespace PackLegion
 
                                         baseContent = new byte[baseFatEntry.compressedSize];
 
-                                        commonDatStream.Seek((long)baseFatEntry.offset, SeekOrigin.Begin);
-                                        commonDatStream.Read(baseContent, 0, (int)baseFatEntry.compressedSize);
+                                        patchDatStream.Seek((long)baseFatEntry.offset, SeekOrigin.Begin);
+                                        patchDatStream.Read(baseContent, 0, (int)baseFatEntry.compressedSize);
 
                                         match = true;
                                     }
                                 }
-                            }
 
-                            if (match != true)
-                            {
-                                Utility.Log.ToConsole($"Could not combine entry: {path}");
-                                //throw new FileNotFoundException("Could not find base file");
-                            }
-                            else
-                            {
-                                Stream baseDatStream = new MemoryStream(baseContent);
-
-                                int baseFileCompressionScheme = (int)baseFatEntry.compressionScheme;
-
-                                if (baseFileCompressionScheme != 0)
+                                // search in common
+                                if (match != true)
                                 {
-                                    int baseFileSizeCompressed = (int)baseFatEntry.compressedSize;
-                                    int baseFileSizeUncompressed = (int)baseFatEntry.uncompressedSize;
+                                    FatEntry[] commonEntries = commonFat.entries.OrderBy(e => e.offset).ToArray();
 
-                                    if (baseFileCompressionScheme == 3)
+                                    foreach (FatEntry entry in commonEntries)
                                     {
-                                        Compression.Schemes.LZ4LW.Decompress(
-                                            baseDatStream,
-                                            baseFileSizeCompressed,
-                                            baseDatStreamDecompressed,
-                                            baseFileSizeUncompressed);
-                                    }
-                                    else
-                                    {
-                                        throw new InvalidDataException("Unsupported compression scheme");
-                                    }
+                                        if (entry.nameHash == hash)
+                                        {
+                                            baseFatEntry = entry;
 
-                                    if ((int)baseDatStreamDecompressed.Length != baseFileSizeUncompressed)
-                                    {
-                                        throw new InvalidDataException("Decompression failed");
+                                            baseContent = new byte[baseFatEntry.compressedSize];
+
+                                            commonDatStream.Seek((long)baseFatEntry.offset, SeekOrigin.Begin);
+                                            commonDatStream.Read(baseContent, 0, (int)baseFatEntry.compressedSize);
+
+                                            match = true;
+                                        }
                                     }
+                                }
+
+                                if (match != true)
+                                {
+                                    Utility.Log.ToConsole($"Could not combine entry: {path}");
+                                    //throw new FileNotFoundException("Could not find base file");
                                 }
                                 else
                                 {
-                                    baseDatStreamDecompressed = baseDatStream;
-                                }
+                                    Stream baseDatStream = new MemoryStream(baseContent);
 
-                                Fcb inputFcbFile = new Fcb();
-                                inputFcbFile.Deserialize(stream);
+                                    int baseFileCompressionScheme = (int)baseFatEntry.compressionScheme;
 
-                                Fcb baseFcbFile = new Fcb();
-                                baseFcbFile.Deserialize(baseDatStreamDecompressed);
+                                    if (baseFileCompressionScheme != 0)
+                                    {
+                                        int baseFileSizeCompressed = (int)baseFatEntry.compressedSize;
+                                        int baseFileSizeUncompressed = (int)baseFatEntry.uncompressedSize;
 
-                                stream.Close();
-                                baseDatStreamDecompressed.Close();
+                                        if (baseFileCompressionScheme == 3)
+                                        {
+                                            Compression.Schemes.LZ4LW.Decompress(
+                                                baseDatStream,
+                                                baseFileSizeCompressed,
+                                                baseDatStreamDecompressed,
+                                                baseFileSizeUncompressed);
+                                        }
+                                        else
+                                        {
+                                            throw new InvalidDataException("Unsupported compression scheme");
+                                        }
 
-                                if (inputFcbFile.root.Children.Count < baseFcbFile.root.Children.Count)
-                                {
-                                    Stream newDatStream = new MemoryStream();
-                                    Fcb newFcbFile = baseFcbFile;
-                                    newFcbFile.Combine(inputFcbFile);
-                                    newFcbFile.Serialize(newDatStream);
+                                        if ((int)baseDatStreamDecompressed.Length != baseFileSizeUncompressed)
+                                        {
+                                            throw new InvalidDataException("Decompression failed");
+                                        }
+                                    }
+                                    else
+                                    {
+                                        baseDatStreamDecompressed = baseDatStream;
+                                    }
 
-                                    stream = newDatStream;
+                                    Fcb inputFcbFile = new Fcb();
+                                    inputFcbFile.Deserialize(stream);
 
-                                    combined = true;
+                                    Fcb baseFcbFile = new Fcb();
+                                    baseFcbFile.Deserialize(baseDatStreamDecompressed);
+
+                                    stream.Close();
+                                    baseDatStreamDecompressed.Close();
+
+                                    if (inputFcbFile.root.Children.Count < baseFcbFile.root.Children.Count)
+                                    {
+                                        Stream newDatStream = new MemoryStream();
+                                        Fcb newFcbFile = baseFcbFile;
+                                        newFcbFile.Combine(inputFcbFile);
+                                        newFcbFile.Serialize(newDatStream);
+
+                                        stream = newDatStream;
+
+                                        combined = true;
+                                    }
                                 }
                             }
+
                         }
                     }
 
@@ -618,6 +645,35 @@ namespace PackLegion
 
                 return null; //Convert.ToString($"0x{hash:X16}");
             }
+
+            /*
+            uint FcbReadEntryCount(Stream input, Endian endian)
+            {
+                input.Seek(16, SeekOrigin.Begin);
+
+                var value = input.ReadValueU8();
+
+                if (value < 0xFE)
+                {
+                    return value;
+                }
+
+                return input.ReadValueU32(endian);
+            }
+
+            bool FcbIsSuitableForLibraryMultiExport(Fcb bof)
+            {
+                // Source: Gibbed.Disrupt
+                uint LibHash = 0xA90F3BCC;
+                uint LibItemHash = 0x72DE4948;
+                uint TextHidNameHash = 0x9D8873F8;
+
+                return bof.root.Fields.Count == 0 &&
+                       bof.root.NameHash == LibHash &&
+                       bof.root.Children.Any(c => c.NameHash != LibItemHash ||
+                                                  c.Fields.ContainsKey(TextHidNameHash) == false) == false;
+            }
+            */
         }
 
         public static void WorkNew()
