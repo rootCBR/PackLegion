@@ -35,7 +35,7 @@ namespace PackLegion
                 {
                         "-o",
                         "-c",
-                        "-v",
+                        //"-v",
                         //"-n",
                         @"D:\Modding\Disrupt\WDL\_patch",
                         "patch.fat"
@@ -228,7 +228,6 @@ namespace PackLegion
                     }
                 }
 
-
                 if (outputFat.entries.Count > 0)
                 {
                     //Utility.Log.ToConsole("Iterating original files...");
@@ -242,16 +241,25 @@ namespace PackLegion
                         inputDatStream = patchDatStream;
                     }
 
+                    ushort percentage = 0;
+
                     for (int a = 0; a < entries.Length; a++)
                     {
                         double x = entries[a].offset;
                         double y = inputDatStream.Length;
                         double t = x / y;
-                        int percentage = (int)Math.Round(t * 100);
+                        ushort currentPercent = (ushort)Math.Round(t * 100);
 
-                        Console.ForegroundColor = ConsoleColor.DarkGray;
-                        Console.Write($"\rIterating original files... ({percentage}%)");
-                        Console.ResetColor();
+                        if (currentPercent > percentage || percentage == 0)
+                        {
+                            percentage = currentPercent;
+
+                            Console.ForegroundColor = ConsoleColor.DarkGray;
+                            Console.Write($"\rIterating original files... ({currentPercent}%)");
+                            Console.ResetColor();
+
+                            // how do you like me now?
+                        }
 
                         FatEntry entry = entries[a];
 

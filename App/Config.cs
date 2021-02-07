@@ -48,7 +48,7 @@ namespace PackLegion
             v1.15 29.01.2021 17:06
             v1.16 30.01.2021 02:11
             v1.17 30.01.2021 22:30
-            v1.18 04.02.2021 19:10
+            v1.18 07.02.2021 20:31
         */
         public static readonly string BuildVersion = "1.18";
 
