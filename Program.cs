@@ -33,9 +33,9 @@ namespace PackLegion
                 /*
                 args = new string[]
                 {
-                        "-o",
+                        //"-o",
                         "-c",
-                        //"-v",
+                        "-v",
                         //"-n",
                         @"D:\Modding\Disrupt\WDL\_patch",
                         "patch.fat"
@@ -484,7 +484,7 @@ namespace PackLegion
                                     Fcb baseFcbFile = new Fcb();
                                     baseFcbFile.Deserialize(baseDatStreamDecompressed);
 
-                                    stream.Close();
+                                    //stream.Close(); // finally found you, sucker
                                     baseDatStreamDecompressed.Close();
 
                                     if (inputFcbFile.root.Children.Count < baseFcbFile.root.Children.Count)
@@ -502,6 +502,11 @@ namespace PackLegion
                             }
 
                         }
+                    }
+
+                    if (!outputDatStream.CanRead || !stream.CanRead)
+                    {
+                        Console.WriteLine("Test");
                     }
 
                     outputFatEntries.Add(new FatEntry()
