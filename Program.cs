@@ -26,34 +26,11 @@ namespace PackLegion
             {
                 Utility.Log.ToConsole(Config.UsageString);
 
-                //Console.ReadKey(true);
+                Console.ReadKey(true);
 
-                //return;
-
-                /*
-                args = new string[]
-                {
-                        "-o",
-                        "-c",
-                        //"-v",
-                        //"-n",
-                        @"D:\Modding\Disrupt\WDL\_patch",
-                        "patch.fat"
-                };
-                */
+                return;
 
                 /*
-                args = new string[]
-                {
-                        //"-o",
-                        //"-c",
-                        "-v",
-                        //"-n",
-                        @"D:\Modding\Archive\Watch Dogs Legion\patch",
-                        "patch.fat"
-                };
-                */
-
                 args = new string[]
                 {
                         //"-o",
@@ -63,6 +40,7 @@ namespace PackLegion
                         @"D:\Modding\Disrupt\WDL\_patch",
                         "patch.fat"
                 };
+                */
             }
 
             if (Config.ProcessArgs(args) > 0)
@@ -103,7 +81,7 @@ namespace PackLegion
                 throw new Exception("Invalid number of arguments");
             }
 
-            Console.ReadKey(true);
+            //Console.ReadKey(true);
         }
 
         public static void WorkReallyNew()
@@ -509,18 +487,26 @@ namespace PackLegion
                                     //stream.Close(); // finally found you, sucker
                                     baseDatStreamDecompressed.Close();
 
-                                    Stream newDatStream = new MemoryStream();
-                                    Fcb newFcbFile = baseFcbFile;
-                                    newFcbFile.Combine(inputFcbFile);
-                                    newFcbFile.Serialize(newDatStream);
+                                    if (inputFcbFile.root.Children.Count < baseFcbFile.root.Children.Count)
+                                    {
+                                        Stream newDatStream = new MemoryStream();
+                                        Fcb newFcbFile = baseFcbFile;
+                                        newFcbFile.Combine(inputFcbFile);
+                                        newFcbFile.Serialize(newDatStream);
 
-                                    stream = newDatStream;
+                                        stream = newDatStream;
 
-                                    combined = true;
+                                        combined = true;
+                                    }
                                 }
                             }
 
                         }
+                    }
+
+                    if (!outputDatStream.CanRead || !stream.CanRead)
+                    {
+                        Console.WriteLine("Test");
                     }
 
                     outputFatEntries.Add(new FatEntry()

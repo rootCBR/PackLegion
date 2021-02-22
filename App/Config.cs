@@ -50,9 +50,8 @@ namespace PackLegion
             v1.17 30.01.2021 22:30
             v1.18 07.02.2021 20:31
             v1.19 08.02.2021 01:22
-            v1.20 22.02.2021 16:24
         */
-        public static readonly string BuildVersion = "1.20";
+        public static readonly string BuildVersion = "1.19";
 
         public static string VersionString
         {
