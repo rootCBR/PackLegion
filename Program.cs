@@ -487,17 +487,14 @@ namespace PackLegion
                                     //stream.Close(); // finally found you, sucker
                                     baseDatStreamDecompressed.Close();
 
-                                    if (inputFcbFile.root.Children.Count < baseFcbFile.root.Children.Count)
-                                    {
-                                        Stream newDatStream = new MemoryStream();
-                                        Fcb newFcbFile = baseFcbFile;
-                                        newFcbFile.Combine(inputFcbFile);
-                                        newFcbFile.Serialize(newDatStream);
+                                    Stream newDatStream = new MemoryStream();
+                                    Fcb newFcbFile = baseFcbFile;
+                                    newFcbFile.Combine(inputFcbFile);
+                                    newFcbFile.Serialize(newDatStream);
 
-                                        stream = newDatStream;
+                                    stream = newDatStream;
 
-                                        combined = true;
-                                    }
+                                    combined = true;
                                 }
                             }
 
