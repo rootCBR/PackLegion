@@ -1,3 +1,5 @@
+**PackLegion is deprecated and has been superceded by [DisruptManager](https://github.com/rootCBR/DisruptManager).**
+
 # PackLegion
 
 This tool creates a new DAT/FAT file pair containing the files of the specified input folder.
